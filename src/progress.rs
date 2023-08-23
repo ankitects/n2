@@ -247,20 +247,29 @@ impl FancyState {
     }
 
     fn task_finished(&mut self, id: BuildId, build: &Build, result: &TaskResult) {
+        // Task completed.
         self.tasks
             .remove(self.tasks.iter().position(|t| t.id == id).unwrap());
-        match result.termination {
+        let show_output = match result.termination {
             Termination::Success => {
-                if result.output.is_empty() {
-                    // Common case: don't show anything.
+                if result.output.is_empty() || build.hide_success {
+                    // Common case, or output suppressed: don't show anything.
+                    false
                 } else {
-                    self.log(build_message(build))
+                    self.log(build_message(build));
+                    true
                 }
             }
-            Termination::Interrupted => self.log(&format!("interrupted: {}", build_message(build))),
-            Termination::Failure => self.log(&format!("failed: {}", build_message(build))),
+            Termination::Interrupted => {
+                self.log(&format!("interrupted: {}", build_message(build)));
+                true
+            }
+            Termination::Failure => {
+                self.log(&format!("failed: {}", build_message(build)));
+                true
+            }
         };
-        if !result.output.is_empty() {
+        if !result.output.is_empty() && show_output {
             std::io::stdout().write_all(&result.output).unwrap();
         }
         self.dirty();
